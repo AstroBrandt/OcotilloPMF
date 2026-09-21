@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "This is a python library to generate synthetic clusters of protostars in steady state"
 readme = "README.md"
 authors = [
-    { name = "Brandt", email = "gaches@ph1.uni-koeln.de" }
+    { name = "Brandt Gaches", email = "brandt.gaches@uni-due.de" }
 ]
 requires-python = ">=3.11"
 dependencies = [
