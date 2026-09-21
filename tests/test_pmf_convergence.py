@@ -1,11 +1,16 @@
-"""Adapted from examples/protoclusterGen.ipynb: checks that PhiInvertSample's bivariate sampling converges onto the semi-analytic PMF as N grows."""
+"""Adapted from examples/protoclusterGen.ipynb: checks that PhiInvertSample's
+bivariate sampling converges onto the semi-analytic PMF as N grows."""
+
+import platform
+from itertools import pairwise
 
 import numpy as np
+import scipy
 import scipy.integrate as sint
 
 from ocotillopmf import PMF, PowerLawAccrete
 
-BINS = np.linspace(-4, 5, 25)
+SAMPLE_SIZES = (100, 1000, 10000, 100000)
 
 
 def analytic_pmf(plaw, imf, ml, mmax, n_grid=500):
@@ -13,6 +18,8 @@ def analytic_pmf(plaw, imf, ml, mmax, n_grid=500):
     psim = []
     for mi in m:
         mf = np.logspace(np.log10(max(ml, mi)), np.log10(mmax), n_grid)
+        # tacc(m=mf) is singular for tapered accretion (accretion rate -> 0 as m -> mf),
+        # so exclude that boundary point, mirroring PhiInvertSample's strict mi < mfi mask.
         mf = mf[mf > mi]
         if len(mf) < 2:
             psim.append(0.0)
@@ -25,13 +32,21 @@ def analytic_pmf(plaw, imf, ml, mmax, n_grid=500):
 
 
 def sampling_error(m_arr, marr, psim):
-    hist, edges = np.histogram(np.log(m_arr), bins=BINS, density=True)
+    # 'auto' bins adapt to where the sample actually concentrates, instead of
+    # a fixed range that's mostly empty and lets a handful of stray counts
+    # dominate the RMS comparison.
+    hist, edges = np.histogram(np.log(m_arr), bins="auto", density=True)
     centers = 0.5 * (edges[:-1] + edges[1:])
     analytic_at_centers = np.interp(centers, np.log(marr), psim)
     return np.sqrt(np.mean((hist - analytic_at_centers) ** 2))
 
 
 def test_phi_invert_sample_converges_to_analytic_pmf():
+    print(
+        f"\nnumpy {np.__version__}, scipy {scipy.__version__}, "
+        f"platform {platform.platform()}"
+    )
+
     plaw = PowerLawAccrete(0.5, 0.75, 3.6e-5, deltan1=1.0)
     pmf = PMF(plaw, seed=42)
     marr, psim = analytic_pmf(plaw, pmf.IMF, pmf.ml, pmf.mmax)
@@ -41,21 +56,16 @@ def test_phi_invert_sample_converges_to_analytic_pmf():
     # floating-point difference between platforms can flip that branch for a
     # single star and desync every draw after it. Re-seeding before each N
     # keeps the runs independent instead of letting an unrelated smaller-N
-    # run perturb the N=10000 draw.
+    # run perturb a later one.
     errors = []
-    for n in (10, 100, 1000, 10000):
+    for n in SAMPLE_SIZES:
         pmf = PMF(plaw, seed=42)
         m_arr, _ = pmf.PhiInvertSample(N=n)
         errors.append(sampling_error(m_arr, marr, psim))
 
-    # RMS error against the analytic curve should shrink sharply over the
-    # first few sample sizes, where there's still plenty of room to improve...
-    assert errors[1] < errors[0]
-    assert errors[2] < errors[1]
-    # ...but N=1000 -> N=10000 sits on a discretization-bias floor (residual
-    # mismatch between the fixed histogram bins and the smooth analytic
-    # curve) where the margin is too thin to survive platform-level
-    # floating-point differences, so only check it doesn't regress outright.
-    assert errors[3] < errors[1]
+    print(f"errors for N={SAMPLE_SIZES}: {errors}")
+
+    # RMS error against the analytic curve should shrink monotonically as N grows.
+    assert all(e2 < e1 for e1, e2 in pairwise(errors)), errors
     # The largest sample should land close to the analytic solution.
-    assert errors[-1] < 0.06
+    assert errors[-1] < 0.01, errors
