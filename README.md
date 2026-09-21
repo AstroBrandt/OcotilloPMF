@@ -47,8 +47,11 @@ and convergence checks on the sampler.
 
 ## License
 
-TBD
+BSD-3-Clause
 
 ## Author
 
-Brandt (brandt.gaches@uni-due.de)
+Brandt Gaches (brandt.gaches@uni-due.de) \
+Emmy Noether Junior Group Leader \
+University of Duisburg-Essen \
+[brandt.gaches.space](https://www.brandt-gaches.space)
