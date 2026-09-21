@@ -31,6 +31,14 @@ def analytic_pmf(plaw, imf, ml, mmax, n_grid=500):
     return m, psim
 
 
+def describe(name, arr):
+    arr = np.asarray(arr, dtype=float)
+    print(
+        f"  {name}: n={arr.size} nan={np.isnan(arr).sum()} "
+        f"inf={np.isinf(arr).sum()} min={np.nanmin(arr)} max={np.nanmax(arr)}"
+    )
+
+
 def sampling_error(m_arr, marr, psim):
     # 'auto' bins adapt to where the sample actually concentrates, instead of
     # a fixed range that's mostly empty and lets a handful of stray counts
@@ -50,6 +58,8 @@ def test_phi_invert_sample_converges_to_analytic_pmf():
     plaw = PowerLawAccrete(0.5, 0.75, 3.6e-5, deltan1=1.0)
     pmf = PMF(plaw, seed=42)
     marr, psim = analytic_pmf(plaw, pmf.IMF, pmf.ml, pmf.mmax)
+    print("analytic curve:")
+    describe("psim", psim)
 
     # Each star consumes either one or two draws from the global RNG stream
     # (PhiInvertSample's `continue` branch skips the second draw), so a tiny
@@ -60,7 +70,10 @@ def test_phi_invert_sample_converges_to_analytic_pmf():
     errors = []
     for n in SAMPLE_SIZES:
         pmf = PMF(plaw, seed=42)
-        m_arr, _ = pmf.PhiInvertSample(N=n)
+        m_arr, mf_arr = pmf.PhiInvertSample(N=n)
+        print(f"N={n}:")
+        describe("m_arr", m_arr)
+        describe("mf_arr", mf_arr)
         errors.append(sampling_error(m_arr, marr, psim))
 
     print(f"errors for N={SAMPLE_SIZES}: {errors}")
