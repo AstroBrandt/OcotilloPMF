@@ -1,8 +1,8 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/AstroBrandt/OcotilloPMF/main/docs/assets/ocotillopmf-logo-dark.svg">
-    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/AstroBrandt/OcotilloPMF/main/docs/assets/ocotillopmf-logo-light.svg">
-    <img alt="OcotilloPMF" src="https://raw.githubusercontent.com/AstroBrandt/OcotilloPMF/main/docs/assets/ocotillopmf-logo-light.svg" height="110">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/ocotillopmf-logo-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/ocotillopmf-logo-light.svg">
+    <img alt="OcotilloPMF" src="docs/assets/ocotillopmf-logo-light.svg" height="110">
   </picture>
 </p>
 
