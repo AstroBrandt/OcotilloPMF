@@ -19,8 +19,15 @@ def analytic_pmf(plaw, imf, ml, mmax, n_grid=500):
     for mi in m:
         mf = np.logspace(np.log10(max(ml, mi)), np.log10(mmax), n_grid)
         # tacc(m=mf) is singular for tapered accretion (accretion rate -> 0 as m -> mf),
-        # so exclude that boundary point, mirroring PhiInvertSample's strict mi < mfi mask.
-        mf = mf[mf > mi]
+        # so exclude that boundary point (mf[0], constructed to equal mi) along with
+        # any further near-duplicate points from a razor-thin range (mi close to
+        # mmax). Comparing against mf[0] itself, rather than against an
+        # independently-recomputed mi, keeps this a same-array self-comparison:
+        # `mf > mi` depends on a log10/power round-trip landing on the same side of
+        # equality as mi, which holds on macOS but not always on Linux/glibc,
+        # letting the singular point slip through and corrupt the whole curve once
+        # normalized.
+        mf = mf[mf > mf[0]]
         if len(mf) < 2:
             psim.append(0.0)
             continue
