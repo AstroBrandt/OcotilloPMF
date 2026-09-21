@@ -1,8 +1,29 @@
+"""Protostellar photospheric and accretion luminosities."""
+
 import numpy as np
 import scipy.interpolate as si
 
 
 class LuminosityObject:
+    """Zero-age main sequence and accretion luminosities for a protostar.
+
+    Implements ZAMS mass-luminosity and mass-radius fits, combined with
+    an accretion model, to compute a protostar's total (photospheric +
+    accretion) luminosity and its FUV-band fraction.
+
+    Parameters
+    ----------
+    accObj : object
+        Accretion model instance (e.g.
+        :class:`~ocotillopmf.accretion.PowerLawAccrete`) exposing an
+        ``acc`` method.
+
+    Attributes
+    ----------
+    accObj : object
+        See Parameters.
+    """
+
     # PARAMETERS
     RSUN = 6.957e10
     LSUN = 3.848e33
@@ -28,6 +49,18 @@ class LuminosityObject:
     accObj = None
 
     def lZAMS(self, m):
+        """Zero-age main sequence luminosity fit.
+
+        Parameters
+        ----------
+        m : float or array_like
+            Stellar mass, in Msun.
+
+        Returns
+        -------
+        float or ndarray
+            ZAMS luminosity, in Lsun.
+        """
         LZAMS = (self.ALPHA * m**5.5 + self.BETA * m**11) / (
             self.GAMMA
             + m**3
@@ -39,6 +72,18 @@ class LuminosityObject:
         return LZAMS
 
     def rZAMS(self, m):
+        """Zero-age main sequence radius fit.
+
+        Parameters
+        ----------
+        m : float or array_like
+            Stellar mass, in Msun.
+
+        Returns
+        -------
+        float or ndarray
+            ZAMS radius, in Rsun.
+        """
         RZAMS = (
             self.THETA * m**2.5
             + self.IOTA * m**6.5
@@ -55,10 +100,41 @@ class LuminosityObject:
         return RZAMS
 
     def LZAMS(self, m, mf):
+        """Zero-age main sequence luminosity, in cgs units.
+
+        Parameters
+        ----------
+        m : float or array_like
+            Current stellar mass, in Msun.
+        mf : float or array_like
+            Final stellar mass, in Msun. Unused; kept for a consistent
+            ``(m, mf)`` call signature across luminosity methods.
+
+        Returns
+        -------
+        float or ndarray
+            ZAMS luminosity, in erg/s.
+        """
         LZ = self.lZAMS(m) * self.LSUN
         return LZ
 
     def LACC(self, m, mf, r):  # All in solar units
+        """Accretion luminosity.
+
+        Parameters
+        ----------
+        m : float or array_like
+            Current stellar mass, in Msun.
+        mf : float or array_like
+            Final stellar mass, in Msun.
+        r : float or array_like
+            Stellar radius, in Rsun.
+
+        Returns
+        -------
+        float or ndarray
+            Accretion luminosity, in erg/s.
+        """
         solarAcc_to_cgs = 6.305286e25  # to g/s
         LA = (self.G * (m * self.MSUN) * self.accObj.acc(m, mf) * solarAcc_to_cgs) / (
             r * self.RSUN
@@ -66,6 +142,24 @@ class LuminosityObject:
         return LA
 
     def FUV_Frac(self, L, r):
+        """Fraction of luminosity emitted in the FUV band.
+
+        Estimates an effective temperature from `L` and `r`, then looks
+        up the corresponding FUV fraction from a tabulated blackbody
+        FUV-fraction curve.
+
+        Parameters
+        ----------
+        L : float or array_like
+            Luminosity, in erg/s.
+        r : float or array_like
+            Radius, in cm.
+
+        Returns
+        -------
+        float or ndarray
+            Fraction of `L` emitted in the FUV band, in [0, 1].
+        """
         SIGMA = 5.6704e-5
         Teff = (L / (4.0 * np.pi * r * r * SIGMA)) ** (0.25)
         x_arr = [
@@ -154,6 +248,22 @@ class LuminosityObject:
                 return frac(np.log10(Teff))
 
     def FUV_LUM(self, m, mf, r):
+        """Total FUV luminosity, combining ZAMS and accretion components.
+
+        Parameters
+        ----------
+        m : float or array_like
+            Current stellar mass, in Msun.
+        mf : float or array_like
+            Final stellar mass, in Msun.
+        r : float or array_like
+            Stellar radius, in Rsun.
+
+        Returns
+        -------
+        float or ndarray
+            Combined ZAMS + accretion FUV luminosity, in erg/s.
+        """
         lz = self.LZAMS(m, mf)
         la = self.LACC(m, mf, r * self.RSUN)
         lzfuv = lz * self.FUV_Frac(lz, r * self.RSUN)

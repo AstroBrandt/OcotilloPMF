@@ -1,3 +1,5 @@
+"""Sampling of the bivariate protostellar mass function (PMF)."""
+
 import numpy as np
 import numpy.random as nr
 import scipy.integrate as sint
@@ -5,12 +7,61 @@ import scipy.interpolate as si
 
 
 class PMF:
+    """Sampler for the bivariate protostellar mass function.
+
+    Given an accretion model and an initial mass function (IMF), samples
+    the joint distribution of (current mass, final mass) for a
+    population of protostars, following the PMF/PLF formalism of McKee &
+    Offner (2010) and Offner & McKee (2011).
+
+    Parameters
+    ----------
+    accObj : object
+        Accretion model instance (e.g.
+        :class:`~ocotillopmf.accretion.PowerLawAccrete`) exposing
+        ``acc``, ``tacc``, and ``tmav`` methods.
+    IMF : callable, optional
+        Initial mass function, called as ``IMF(m)``. Defaults to
+        :meth:`Chabrier05`.
+    mmax : float, optional
+        Maximum stellar mass, in Msun. Default is 100.0.
+    ml : float, optional
+        Minimum stellar mass, in Msun. Default is 0.033.
+    seed : int, optional
+        Seed for the global NumPy random number generator. If None, the
+        generator is left unseeded (results are not reproducible).
+
+    Attributes
+    ----------
+    accObj : object
+        See Parameters.
+    IMF : callable
+        See Parameters.
+    mmax : float
+        See Parameters.
+    ml : float
+        See Parameters.
+    """
+
     accObj = None
     IMF = None
     mmax = 100.0
     ml = 0.033
 
     def Chabrier05(self, m):
+        """Chabrier (2005) system initial mass function.
+
+        Parameters
+        ----------
+        m : float or array_like
+            Stellar mass, in Msun.
+
+        Returns
+        -------
+        float or ndarray
+            Relative probability density at `m`. Used as the default
+            `IMF` callable; not independently normalized.
+        """
         m = np.asarray(m, dtype=float)
         bi = 0.740741 * (1.0 - self.mmax ** (-27.0 / 20.0))
         A1 = 1.0 / (2.851 + bi * 0.44956)
@@ -33,9 +84,36 @@ class PMF:
         self.ml = ml
 
     def IMFArr(self, m):
+        """Vectorized IMF evaluation.
+
+        Parameters
+        ----------
+        m : array_like
+            Stellar masses, in Msun.
+
+        Returns
+        -------
+        ndarray
+            IMF value at each mass in `m`.
+        """
         return np.array([self.IMF(mi) for mi in m])
 
     def CIMF(self, ML=None, MU=None):
+        """Inverse cumulative IMF, for inverse-transform sampling of the IMF alone.
+
+        Parameters
+        ----------
+        ML : float, optional
+            Lower mass bound, in Msun. Defaults to `self.ml`.
+        MU : float, optional
+            Upper mass bound, in Msun. Defaults to `self.mmax`.
+
+        Returns
+        -------
+        callable
+            Interpolating function mapping a cumulative probability in
+            [0, 1] to a stellar mass, in Msun.
+        """
         if ML == None:
             ML = self.ml
         if MU == None:
@@ -47,6 +125,24 @@ class PMF:
         return f
 
     def interpPhip2_mf(self, marr, mfarr, psip2, mi):
+        """Linearly interpolate the bivariate PMF grid at a given current mass.
+
+        Parameters
+        ----------
+        marr : ndarray
+            Grid of current masses, in Msun.
+        mfarr : ndarray
+            Grid of final masses, in Msun.
+        psip2 : ndarray
+            Bivariate PMF evaluated on the `(mfarr, marr)` grid.
+        mi : float
+            Current mass at which to interpolate, in Msun.
+
+        Returns
+        -------
+        ndarray
+            PMF as a function of final mass, at `mi`.
+        """
         if mi <= marr[0]:
             indx = 0
         elif mi >= marr[-1]:
@@ -65,10 +161,41 @@ class PMF:
         return slp * dx + mat0
 
     def psip2(self, m, mf):
+        """Bivariate protostellar mass function.
+
+        Parameters
+        ----------
+        m : float or array_like
+            Current protostellar mass, in Msun.
+        mf : float or array_like
+            Final protostellar mass, in Msun.
+
+        Returns
+        -------
+        float or ndarray
+            Relative probability density of (m, mf).
+        """
         tav = self.accObj.tmav(self.IMF, self.ml, self.mmax)
         return (self.IMF(mf) * self.accObj.tacc(m, mf)) / (tav)
 
     def PhiInvertSample(self, N=100):
+        """Sample the bivariate (current mass, final mass) distribution.
+
+        Uses inverse-transform sampling on a discretized version of the
+        bivariate PMF to draw `N` independent (m, mf) pairs.
+
+        Parameters
+        ----------
+        N : int, optional
+            Number of protostars to sample. Default is 100.
+
+        Returns
+        -------
+        m : ndarray
+            Sampled current masses, in Msun.
+        mf : ndarray
+            Sampled final masses, in Msun.
+        """
         # Calculate the analytic bivariate on a massres^2 grid
         massres = 512
         mi = np.logspace(np.log10(self.ml), np.log10(self.mmax), massres)
@@ -121,3 +248,135 @@ class PMF:
             mfs.append(mfrnd)
 
         return np.array(mis), np.array(mfs)
+
+    def calcPMF(self, ML=0.04, MU=3.0, res=2**8):
+        """Calculate a semi-analytic PMF for a given upper and lower mass range.
+
+        Numerically integrates the equation for the PMF, rather than discretely sampling the bivariation function.
+
+        Parameters
+        ----------
+        ML : float, optional
+            Lower limit of the mass function. Default is 0.04.
+        MU : float, optional
+            Upper limit of the mass function. Default os 3.0.
+        res : Size of the returning arrays. Default is 256.
+
+        Returns
+        -------
+        m : ndarray
+            Mass array of the functional, psi(m)
+        PSIM : ndarray
+            PMF as a function of mass.
+        """
+        m = np.logspace(np.log10(ML), np.log10(MU), res)
+        PSIM = []
+        for mi in m:
+            mf = np.logspace(np.log10(max(ML, mi)), np.log10(MU), res)
+            # tacc(m=mf) is singular for tapered accretion (accretion rate -> 0 as m -> mf),
+            # so exclude that boundary point, mirroring PhiInvertSample's strict mi < mfi mask.
+            mf = mf[mf > mi]
+            if len(mf) < 2:
+                PSIM.append(0.0)
+                continue
+            integrand = self.IMFArr(mf) * self.accObj.tacc(mi, mf)
+            PSIM.append(sint.trapezoid(integrand, x=np.log(mf)))
+        PSIM = np.array(PSIM) / self.accObj.tmav(self.IMF, ML, MU)
+        return m, PSIM
+
+    def synthesisClusterStatistic(self, Nproto, Nsamp=None, funcQuantity=None):
+        """Mean and standard deviation of a cluster-integrated quantity.
+
+        For each cluster size in `Nproto`, draws `Nsamp` independent
+        clusters from the PMF, evaluates `funcQuantity` for every
+        protostar, sums it over each cluster, and computes the mean and
+        standard deviation of that per-cluster sum across the draws.
+
+        Parameters
+        ----------
+        Nproto : int or array_like
+            Number of protostars per cluster. May be a scalar or an array of cluster sizes.
+        Nsamp : int, array_like, or None, optional
+            Number of cluster draws per `Nproto` value. If None
+            (default), uses ``max(10, 1e5 / Nproto)`` for each `Nproto`.
+            If `Nproto` is an array, `Nsamp` may be a scalar (applied to
+            every `Nproto`), an array matching the size of `Nproto`, or
+            None.
+        funcQuantity : callable
+            Function called as ``funcQuantity(m, mf, mdot)``, with
+            arrays of current mass, final mass, and accretion rate for a
+            cluster's protostars (in Msun and Msun/yr). Must return an
+            array of per-protostar quantities, elementwise in its
+            inputs, which are summed to give the cluster total.
+
+        Returns
+        -------
+        mean : float or ndarray
+            Mean of the per-cluster summed quantity, for each `Nproto`.
+        std : float or ndarray
+            Standard deviation of the per-cluster summed quantity, for
+            each `Nproto`.
+        """
+        if funcQuantity is None:
+            raise ValueError("funcQuantity must be provided.")
+
+        scalar_input = np.ndim(Nproto) == 0
+        Nproto_arr = np.atleast_1d(np.asarray(Nproto)).astype(int)
+
+        if Nsamp is None:
+            Nsamp_arr = np.maximum(10, (1e5 / Nproto_arr.astype(float))).astype(int)
+        else:
+            Nsamp_arr = np.atleast_1d(np.asarray(Nsamp))
+            if Nsamp_arr.size == 1:
+                Nsamp_arr = np.full(Nproto_arr.shape, Nsamp_arr[0])
+            elif Nsamp_arr.size != Nproto_arr.size:
+                raise ValueError(
+                    "Nsamp must be a scalar, None, or match the size of Nproto."
+                )
+            Nsamp_arr = Nsamp_arr.astype(int)
+
+        meanArr = []
+        stdArr = []
+        for Nprotoi, Nsampi in zip(Nproto_arr, Nsamp_arr):
+            mbig_arr, mfbig_arr = self.PhiInvertSample(N=int(Nprotoi * Nsampi))
+            mdotbig_arr = self.accObj.acc(mbig_arr, mfbig_arr)
+            qbig_arr = funcQuantity(mbig_arr, mfbig_arr, mdotbig_arr)
+
+            sumArr = np.asarray(qbig_arr).reshape(Nsampi, Nprotoi).sum(axis=1)
+            meanArr.append(np.mean(sumArr))
+            stdArr.append(np.std(sumArr))
+
+        meanArr = np.array(meanArr)
+        stdArr = np.array(stdArr)
+
+        if scalar_input:
+            return meanArr[0], stdArr[0]
+        return meanArr, stdArr
+
+    def get_Ns(self, mmax, ML=0.04, MU=3.0):
+        """Calculate the expected number of stars in a cluster, given a maximal sampled mass.
+
+        Uses the PMF to solve for the expected number of protostars needed to be in a cluster to get a star of mass mmax, given the PMF mass limits
+
+        Parameters
+        ----------
+        mmax : float
+            Maximum protostar mass in the cluster
+        ML : float, optional
+            Lower limit of the mass function. Default is 0.04.
+        MU : float, optional
+            Upper limit of the mass function. Default os 3.0.
+
+        Returns
+        -------
+        Ns : float
+            Expected number of stars needed in the cluster to have at least 1 protostar with mass mmax.
+        """
+        if mmax > MU:
+            raise ValueError("MU must be higher than mmax.")
+        marr, psim = self.calcPMF(ML, MU)
+        psim_func = si.interp1d(np.log(marr), psim)
+        mfarr = np.logspace(np.log10(mmax), np.log10(MU), 2**7)
+        psi_samp = psim_func(np.log(mfarr))
+        integ = sint.trapezoid(psi_samp, x=np.log(mfarr))
+        return 1.0 / integ

@@ -1,11 +1,9 @@
 """Adapted from examples/protoclusterGen.ipynb: checks that PhiInvertSample's
 bivariate sampling converges onto the semi-analytic PMF as N grows."""
 
-import platform
 from itertools import pairwise
 
 import numpy as np
-import scipy
 import scipy.integrate as sint
 
 from ocotillopmf import PMF, PowerLawAccrete
@@ -18,15 +16,9 @@ def analytic_pmf(plaw, imf, ml, mmax, n_grid=500):
     psim = []
     for mi in m:
         mf = np.logspace(np.log10(max(ml, mi)), np.log10(mmax), n_grid)
-        # tacc(m=mf) is singular for tapered accretion (accretion rate -> 0 as m -> mf),
-        # so exclude that boundary point (mf[0], constructed to equal mi) along with
-        # any further near-duplicate points from a razor-thin range (mi close to
-        # mmax). Comparing against mf[0] itself, rather than against an
-        # independently-recomputed mi, keeps this a same-array self-comparison:
-        # `mf > mi` depends on a log10/power round-trip landing on the same side of
-        # equality as mi, which holds on macOS but not always on Linux/glibc,
-        # letting the singular point slip through and corrupt the whole curve once
-        # normalized.
+        # Exclude the singular m==mf point and any near-duplicate points from a
+        # razor-thin range; compared against mf[0] itself so it isn't sensitive
+        # to platform-dependent log10/power rounding.
         mf = mf[mf > mf[0]]
         if len(mf) < 2:
             psim.append(0.0)
@@ -38,18 +30,7 @@ def analytic_pmf(plaw, imf, ml, mmax, n_grid=500):
     return m, psim
 
 
-def describe(name, arr):
-    arr = np.asarray(arr, dtype=float)
-    print(
-        f"  {name}: n={arr.size} nan={np.isnan(arr).sum()} "
-        f"inf={np.isinf(arr).sum()} min={np.nanmin(arr)} max={np.nanmax(arr)}"
-    )
-
-
 def sampling_error(m_arr, marr, psim):
-    # 'auto' bins adapt to where the sample actually concentrates, instead of
-    # a fixed range that's mostly empty and lets a handful of stray counts
-    # dominate the RMS comparison.
     hist, edges = np.histogram(np.log(m_arr), bins="auto", density=True)
     centers = 0.5 * (edges[:-1] + edges[1:])
     analytic_at_centers = np.interp(centers, np.log(marr), psim)
@@ -57,35 +38,16 @@ def sampling_error(m_arr, marr, psim):
 
 
 def test_phi_invert_sample_converges_to_analytic_pmf():
-    print(
-        f"\nnumpy {np.__version__}, scipy {scipy.__version__}, "
-        f"platform {platform.platform()}"
-    )
-
     plaw = PowerLawAccrete(0.5, 0.75, 3.6e-5, deltan1=1.0)
     pmf = PMF(plaw, seed=42)
     marr, psim = analytic_pmf(plaw, pmf.IMF, pmf.ml, pmf.mmax)
-    print("analytic curve:")
-    describe("psim", psim)
 
-    # Each star consumes either one or two draws from the global RNG stream
-    # (PhiInvertSample's `continue` branch skips the second draw), so a tiny
-    # floating-point difference between platforms can flip that branch for a
-    # single star and desync every draw after it. Re-seeding before each N
-    # keeps the runs independent instead of letting an unrelated smaller-N
-    # run perturb a later one.
+    # Reseed per N so each sample size draws independently.
     errors = []
     for n in SAMPLE_SIZES:
         pmf = PMF(plaw, seed=42)
-        m_arr, mf_arr = pmf.PhiInvertSample(N=n)
-        print(f"N={n}:")
-        describe("m_arr", m_arr)
-        describe("mf_arr", mf_arr)
+        m_arr, _ = pmf.PhiInvertSample(N=n)
         errors.append(sampling_error(m_arr, marr, psim))
 
-    print(f"errors for N={SAMPLE_SIZES}: {errors}")
-
-    # RMS error against the analytic curve should shrink monotonically as N grows.
     assert all(e2 < e1 for e1, e2 in pairwise(errors)), errors
-    # The largest sample should land close to the analytic solution.
     assert errors[-1] < 0.01, errors

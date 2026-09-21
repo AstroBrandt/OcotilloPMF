@@ -1,8 +1,41 @@
+"""Steady-state protostellar accretion models."""
+
 import numpy as np
 import scipy.integrate as sint
 
 
 class PowerLawAccrete:
+    """Tapered power-law accretion model for a protostar.
+
+    Implements the steady-state accretion law relating a protostar's
+    instantaneous accretion rate to its current mass `m` and final mass
+    `mf`, following the formalism of McKee & Offner (2010) and Offner &
+    McKee (2011).
+
+    Parameters
+    ----------
+    j : float
+        Power-law index of the accretion rate's dependence on `m/mf`.
+    jf : float
+        Power-law index of the accretion rate's dependence on `mf`.
+    m0 : float
+        Normalization of the accretion rate, in Msun/yr.
+    deltan1 : float, optional
+        Tapering parameter that drives the accretion rate to zero as
+        `m -> mf`. Default is 0 (no tapering).
+
+    Attributes
+    ----------
+    j : float
+        See Parameters.
+    jf : float
+        See Parameters.
+    m0 : float
+        See Parameters.
+    deltan1 : float
+        See Parameters.
+    """
+
     deltan1 = 0.0
     j = 1.0
     jf = 0.0
@@ -17,6 +50,20 @@ class PowerLawAccrete:
         self.deltan1 = deltan1
 
     def acc(self, m, mf):
+        """Instantaneous mass accretion rate.
+
+        Parameters
+        ----------
+        m : float or array_like
+            Current protostellar mass, in Msun.
+        mf : float or array_like
+            Final protostellar mass, in Msun.
+
+        Returns
+        -------
+        float or ndarray
+            Accretion rate dm/dt, in Msun/yr.
+        """
         return (
             self.m0
             * (m / mf) ** self.j
@@ -25,13 +72,56 @@ class PowerLawAccrete:
         )
 
     def tm(self, mf):
+        """Total formation timescale for a star of final mass `mf`.
+
+        Parameters
+        ----------
+        mf : float or array_like
+            Final protostellar mass, in Msun.
+
+        Returns
+        -------
+        float or ndarray
+            Formation timescale, in yr.
+        """
         return (mf ** (1.0 - self.jf) / ((1.0 - self.j) * self.m0)) * (1 + self.deltan1)
 
     def tacc(self, m, mf):
+        """Instantaneous accretion timescale, ``m / acc(m, mf)``.
+
+        Parameters
+        ----------
+        m : float or array_like
+            Current protostellar mass, in Msun.
+        mf : float or array_like
+            Final protostellar mass, in Msun.
+
+        Returns
+        -------
+        float or ndarray
+            Accretion timescale, in yr.
+        """
         # return (1.-self.j)*(m/mf)**(1.-self.j)*(1. - self.deltan1*(m/mf)**(1.-self.j))**(-0.5)*self.tm(mf)/(1.+self.deltan1)
         return m / self.acc(m, mf)
 
     def tmav(self, IMF, ML, MU):
+        """IMF-averaged formation timescale over a mass range.
+
+        Parameters
+        ----------
+        IMF : callable
+            Initial mass function, called as ``IMF(m)`` for a final mass
+            `m`.
+        ML : float
+            Lower mass bound of the integral, in Msun.
+        MU : float
+            Upper mass bound of the integral, in Msun.
+
+        Returns
+        -------
+        float
+            IMF-weighted average formation timescale, in yr.
+        """
         mfs = np.logspace(np.log10(ML), np.log10(MU), int(1e3))
         tmi = self.tm(mfs)
         imfi = np.array([IMF(mi) for mi in mfs])
