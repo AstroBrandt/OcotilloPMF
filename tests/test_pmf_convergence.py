@@ -36,8 +36,15 @@ def test_phi_invert_sample_converges_to_analytic_pmf():
     pmf = PMF(plaw, seed=42)
     marr, psim = analytic_pmf(plaw, pmf.IMF, pmf.ml, pmf.mmax)
 
+    # Each star consumes either one or two draws from the global RNG stream
+    # (PhiInvertSample's `continue` branch skips the second draw), so a tiny
+    # floating-point difference between platforms can flip that branch for a
+    # single star and desync every draw after it. Re-seeding before each N
+    # keeps the runs independent instead of letting an unrelated smaller-N
+    # run perturb the N=10000 draw.
     errors = []
     for n in (10, 100, 1000, 10000):
+        pmf = PMF(plaw, seed=42)
         m_arr, _ = pmf.PhiInvertSample(N=n)
         errors.append(sampling_error(m_arr, marr, psim))
 

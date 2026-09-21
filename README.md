@@ -4,12 +4,18 @@
     <source media="(prefers-color-scheme: light)" srcset="docs/assets/ocotillopmf-logo-light.svg">
     <img alt="OcotilloPMF" src="docs/assets/ocotillopmf-logo-light.svg" height="110">
   </picture>
+  <br>
+  <a href="https://github.com/AstroBrandt/OcotilloPMF/actions/workflows/tests.yml"><img alt="Tests" src="https://github.com/AstroBrandt/OcotilloPMF/actions/workflows/tests.yml/badge.svg"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-BSD--3--Clause-blue"></a>
+  <a href="https://pypi.org/project/ocotillopmf/"><img alt="PyPI version" src="https://img.shields.io/pypi/v/ocotillopmf"></a>
+  <a href="https://pypi.org/project/ocotillopmf/"><img alt="Python versions" src="https://img.shields.io/pypi/pyversions/ocotillopmf"></a>
+  <a href="https://doi.org/10.3847/1538-4357/aaaae2"><img alt="DOI" src="https://img.shields.io/badge/DOI-10.3847%2F1538--4357%2Faaaae2-blue"></a>
 </p>
 
 A Python package for sampling the protostellar mass function (PMF) — the
 joint distribution of current and final stellar mass during star formation —
 under a given accretion model, plus tools for computing the resulting
-accretion and photospheric luminosities. The underlying class is based on the older Python2 code from [Gaches & Offner (2018)](https://scixplorer.org/abs/2018ApJ...854..156G/abstract). It built upon the underlying Protostellar Mass Function (PMF) and Protostellar Luminosity Function (PLF) formalisms of [McKee & Offner (2010)](https://scixplorer.org/abs/2010ApJ...716..167M/abstract) (MO10) and [Offner & McKee (2011)](https://scixplorer.org/abs/2011ApJ...736...53O/abstract) (OM11).
+accretion and photospheric luminosities. The underlying class is based on the older Python2 code from [Gaches & Offner (2018)](https://scixplorer.org/abs/2018ApJ...854..156G/abstract). It built upon the underlying Protostellar Mass Function (PMF) and Protostellar Luminosity Function (PLF) formalisms of [McKee & Offner (2010)](https://scixplorer.org/abs/2010ApJ...716..167M/abstract) (MO10) and [Offner & McKee (2011)](https://scixplorer.org/abs/2011ApJ...736...53O/abstract) (OM11), respectively.
 
 The original version of the code was a monolithic Python2 script written "to work". The new version has been updated to Python3 standards and optimized for much easier use and quicker calculations.
 
