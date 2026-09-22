@@ -73,7 +73,7 @@ accretion = PowerLawAccrete(0.5, 0.75, 3.6e-5, deltan1=1.0)
 pmf = PMF(accretion)
 
 # Sample the bivariate (current mass, final mass) distribution for N protostars
-m, mf = pmf.PhiInvertSample(N=10_000)
+m, mf = pmf.PhiInvertSample(N=10000)
 
 # Instantaneous accretion rate for each sampled star, in Msun/yr
 mdot = accretion.acc(m, mf)
