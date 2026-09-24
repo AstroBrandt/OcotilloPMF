@@ -1,7 +1,10 @@
 """Steady-state protostellar accretion models."""
 
+from collections.abc import Callable
+
 import numpy as np
 import scipy.integrate as sint
+from numpy.typing import ArrayLike
 
 
 class PowerLawAccrete:
@@ -43,13 +46,13 @@ class PowerLawAccrete:
     ml = 0.033
     mmax = 100.0
 
-    def __init__(self, j, jf, m0, deltan1=0):
+    def __init__(self, j: float, jf: float, m0: float, deltan1: float = 0) -> None:
         self.j = j
         self.jf = jf
         self.m0 = m0
         self.deltan1 = deltan1
 
-    def acc(self, m, mf):
+    def acc(self, m: ArrayLike, mf: ArrayLike) -> float | np.ndarray:
         """Instantaneous mass accretion rate.
 
         Parameters
@@ -71,7 +74,7 @@ class PowerLawAccrete:
             * (1.0 - self.deltan1 * (m / mf) ** (1.0 - self.j)) ** (0.5)
         )
 
-    def tm(self, mf):
+    def tm(self, mf: ArrayLike) -> float | np.ndarray:
         """Total formation timescale for a star of final mass `mf`.
 
         Parameters
@@ -86,7 +89,7 @@ class PowerLawAccrete:
         """
         return (mf ** (1.0 - self.jf) / ((1.0 - self.j) * self.m0)) * (1 + self.deltan1)
 
-    def tacc(self, m, mf):
+    def tacc(self, m: ArrayLike, mf: ArrayLike) -> float | np.ndarray:
         """Instantaneous accretion timescale, ``m / acc(m, mf)``.
 
         Parameters
@@ -104,7 +107,7 @@ class PowerLawAccrete:
         # return (1.-self.j)*(m/mf)**(1.-self.j)*(1. - self.deltan1*(m/mf)**(1.-self.j))**(-0.5)*self.tm(mf)/(1.+self.deltan1)
         return m / self.acc(m, mf)
 
-    def tmav(self, IMF, ML, MU):
+    def tmav(self, IMF: Callable[[float], float], ML: float, MU: float) -> float:
         """IMF-averaged formation timescale over a mass range.
 
         Parameters

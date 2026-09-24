@@ -1,5 +1,6 @@
 """Fractal gas clouds and protostar cluster positions, with mass segregation and MST tools."""
 
+from collections.abc import Callable, Sequence
 from itertools import combinations
 
 import numpy as np
@@ -9,6 +10,7 @@ import scipy.sparse.csgraph as scsg
 import scipy.spatial as sspat
 import scipy.spatial.distance as sdist
 from FyeldGenerator import generate_field
+from numpy.typing import ArrayLike
 
 
 class Spatial:
@@ -20,16 +22,19 @@ class Spatial:
     protostar positions are drawn. Cluster positions can optionally be
     mass segregated following Baumgardt et al. (2008), as implemented in
     McLuster (Kuepper et al. 2011), and characterized with minimum
-    spanning trees (:meth:`mst`) and the mass segregation ratio of
-    Allison et al. (2009) (:meth:`lambdaMSR`).
+    spanning trees ([`mst`][ocotillopmf.spatial.Spatial.mst]) and the mass segregation ratio of
+    Allison et al. (2009) ([`lambdaMSR`][ocotillopmf.spatial.Spatial.lambdaMSR]).
 
     Parameters
     ----------
     seed : int, optional
         Seed stored on the object. Every method that draws random numbers
-        (:meth:`makeFBM`, :meth:`makeCloudFBM`, :meth:`makeStellarCluster`,
-        :meth:`segregate` and :meth:`lambdaMSR`) uses a fresh generator
-        seeded with it, so repeated calls give the same result, and a
+        ([`makeFBM`][ocotillopmf.spatial.Spatial.makeFBM],
+        [`makeCloudFBM`][ocotillopmf.spatial.Spatial.makeCloudFBM],
+        [`makeStellarCluster`][ocotillopmf.spatial.Spatial.makeStellarCluster],
+        [`segregate`][ocotillopmf.spatial.Spatial.segregate] and
+        [`lambdaMSR`][ocotillopmf.spatial.Spatial.lambdaMSR]) uses a fresh
+        generator seeded with it, so repeated calls give the same result, and a
         cloud and a cluster made from the same object share the same
         structure. The global NumPy random state is not modified.
         Individual calls can override it with `overSeed`. If None, each
@@ -37,10 +42,10 @@ class Spatial:
         are not reproducible and separate calls do not share structure.
     """
 
-    def __init__(self, seed=None):
+    def __init__(self, seed: int | None = None) -> None:
         self.seed = seed
 
-    def _rng(self, overSeed=None):
+    def _rng(self, overSeed: int | None = None) -> nr.RandomState:
         """Fresh random number generator seeded with `overSeed`, or the object's `seed`.
 
         Uses NumPy's legacy RandomState (Mersenne Twister), the same
@@ -55,17 +60,17 @@ class Spatial:
 
     def makeFBM(
         self,
-        ndim=3,
-        D=None,
-        H=None,
-        L=1.0,
-        nres=128,
-        expon=True,
-        scale=1,
-        log_offset=0,
-        overSeed=None,
-        rng=None,
-    ):
+        ndim: int = 3,
+        D: float | None = None,
+        H: float | None = None,
+        L: float = 1.0,
+        nres: int = 128,
+        expon: bool = True,
+        scale: float = 1,
+        log_offset: float = 0,
+        overSeed: int | None = None,
+        rng: nr.RandomState | None = None,
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Generate a periodic fractional Brownian motion (fBm) field.
 
         A Gaussian random field with power-law power spectrum
@@ -136,14 +141,14 @@ class Spatial:
             rng = self._rng(overSeed)
 
         # Helper that generates power-law power spectrum
-        def Pkgen(n):
-            def Pk(k):
+        def Pkgen(n: float) -> Callable[[np.ndarray], np.ndarray]:
+            def Pk(k: np.ndarray) -> np.ndarray:
                 return np.power(k, -n)
 
             return Pk
 
         # Draw samples from a normal distribution
-        def distrib(shape):
+        def distrib(shape: tuple[int, ...]) -> np.ndarray:
             a = rng.normal(loc=0, scale=1, size=shape)
             b = rng.normal(loc=0, scale=1, size=shape)
             return a + 1j * b
@@ -176,7 +181,7 @@ class Spatial:
             field = np.exp(log_offset + scale * field)
         return xgrid, field
 
-    def recenterField(self, field):
+    def recenterField(self, field: np.ndarray) -> np.ndarray:
         """Roll a periodic field so its mass-weighted center lies at the center of the box.
 
         The center of mass along each axis is the weighted mean direction of the
@@ -211,19 +216,19 @@ class Spatial:
 
     def makeCloudFBM(
         self,
-        ndim=3,
-        D=None,
-        H=None,
-        L=1.0,
-        Ms=5.0,
-        bturb=0.5,
-        n0=1e2,
-        min_dens=1.0,
-        magBeta=1e6,
-        nres=128,
-        recenter=False,
-        overSeed=None,
-    ):
+        ndim: int = 3,
+        D: float | None = None,
+        H: float | None = None,
+        L: float = 1.0,
+        Ms: float = 5.0,
+        bturb: float = 0.5,
+        n0: float = 1e2,
+        min_dens: float = 1.0,
+        magBeta: float = 1e6,
+        nres: int = 128,
+        recenter: bool = False,
+        overSeed: int | None = None,
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Generate a turbulent gas cloud as a log-normal fBm density field.
 
         The width of the log-normal density PDF is set by the turbulence,
@@ -236,11 +241,11 @@ class Spatial:
         ndim : int, optional
             Number of spatial dimensions. Default is 3.
         D : float, optional
-            Fractal dimension of the projected cloud (see :meth:`makeFBM`).
+            Fractal dimension of the projected cloud (see [`makeFBM`][ocotillopmf.spatial.Spatial.makeFBM]).
             Cannot be given together with `H`. If neither is given,
             defaults to 2.4.
         H : float, optional
-            Hurst exponent of the log-density field (see :meth:`makeFBM`).
+            Hurst exponent of the log-density field (see [`makeFBM`][ocotillopmf.spatial.Spatial.makeFBM]).
             Cannot be given together with `D`.
         L : float, optional
             Side length of the box; the grid spans [-L/2, L/2]. Default
@@ -262,12 +267,12 @@ class Spatial:
             Number of grid cells along each axis. Default is 128.
         recenter : bool, optional
             If True, roll the cloud so its center of mass lies at the
-            center of the box (see :meth:`recenterField`). The floor is
+            center of the box (see [`recenterField`][ocotillopmf.spatial.Spatial.recenterField]). The floor is
             added after recentering so it does not dilute the weighting.
             Default is False.
         overSeed : int, optional
             Seed to use for this call instead of the object's `seed` (see
-            :meth:`makeFBM`).
+            [`makeFBM`][ocotillopmf.spatial.Spatial.makeFBM]).
 
         Returns
         -------
@@ -304,29 +309,29 @@ class Spatial:
 
     def makeStellarCluster(
         self,
-        nstar,
-        ndim=3,
-        D=None,
-        H=None,
-        L=1.0,
-        Ms=None,
-        bturb=None,
-        magBeta=None,
-        sigma=1,
-        massSegregate=False,
-        S=None,
-        masses=None,
-        recenter=False,
-        nres=128,
-        overSeed=None,
-    ):
+        nstar: int,
+        ndim: int = 3,
+        D: float | None = None,
+        H: float | None = None,
+        L: float = 1.0,
+        Ms: float | None = None,
+        bturb: float | None = None,
+        magBeta: float | None = None,
+        sigma: float = 1,
+        massSegregate: bool = False,
+        S: float | None = None,
+        masses: ArrayLike | None = None,
+        recenter: bool = False,
+        nres: int = 128,
+        overSeed: int | None = None,
+    ) -> tuple[np.ndarray, ...]:
         """Sample protostar positions from a log-normal fBm density field.
 
-        A log-fBm is generated with :meth:`makeFBM` and treated as a
+        A log-fBm is generated with [`makeFBM`][ocotillopmf.spatial.Spatial.makeFBM] and treated as a
         piecewise-constant probability density: each star is placed in a
         grid cell with probability proportional to the cell's density,
         then at a uniform random position within that cell. The positions
-        can optionally be mass segregated with :meth:`segregate`.
+        can optionally be mass segregated with [`segregate`][ocotillopmf.spatial.Spatial.segregate].
 
         Parameters
         ----------
@@ -336,17 +341,17 @@ class Spatial:
             Number of spatial dimensions. Default is 3.
         D : float, optional
             Fractal dimension of the projected density field (see
-            :meth:`makeFBM`). Cannot be given together with `H`. If
+            [`makeFBM`][ocotillopmf.spatial.Spatial.makeFBM]). Cannot be given together with `H`. If
             neither is given, defaults to 2.4.
         H : float, optional
-            Hurst exponent of the log-density field (see :meth:`makeFBM`).
+            Hurst exponent of the log-density field (see [`makeFBM`][ocotillopmf.spatial.Spatial.makeFBM]).
             Cannot be given together with `D`.
         L : float, optional
             Side length of the box; positions lie in [-L/2, L/2]. Default
             is 1.0.
         Ms : float, optional
             Sonic Mach number. If given, `sigma` is instead set from the
-            turbulence as in :meth:`makeCloudFBM`, and `bturb` and
+            turbulence as in [`makeCloudFBM`][ocotillopmf.spatial.Spatial.makeCloudFBM], and `bturb` and
             `magBeta` must also be given.
         bturb : float, optional
             Turbulent forcing parameter. Required if `Ms` is given.
@@ -369,15 +374,15 @@ class Spatial:
         recenter : bool, optional
             If True, roll the density field so its center of mass lies at
             the center of the box before sampling (see
-            :meth:`recenterField`). Default is False.
+            [`recenterField`][ocotillopmf.spatial.Spatial.recenterField]). Default is False.
         nres : int, optional
             Number of grid cells along each axis of the density field.
-            For a cloud from :meth:`makeCloudFBM` and a cluster to share
+            For a cloud from [`makeCloudFBM`][ocotillopmf.spatial.Spatial.makeCloudFBM] and a cluster to share
             the same structure, they must use the same `nres`, seed,
             `ndim`, and `D` or `H`. Default is 128.
         overSeed : int, optional
             Seed to use for this call instead of the object's `seed` (see
-            :meth:`makeFBM`).
+            [`makeFBM`][ocotillopmf.spatial.Spatial.makeFBM]).
 
         Returns
         -------
@@ -450,7 +455,14 @@ class Spatial:
         # For ndim=3 this unpacks as x, y, z; star i has mass masses[i]
         return tuple(coords)
 
-    def segregate(self, coords, masses, S, soft=1e-2, rng=None):
+    def segregate(
+        self,
+        coords: Sequence[np.ndarray],
+        masses: np.ndarray,
+        S: float,
+        soft: float = 1e-2,
+        rng: nr.RandomState | None = None,
+    ) -> list[np.ndarray]:
         """Mass segregate a set of positions following Baumgardt et al. (2008), as in McLuster.
 
         Positions are ranked from most to least bound by their equal-mass
@@ -518,7 +530,9 @@ class Spatial:
 
         return [c[assign] for c in coords]
 
-    def mst(self, coords):
+    def mst(
+        self, coords: Sequence[ArrayLike]
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Minimum spanning tree (MST) of a set of positions.
 
         The MST is built from the edges of the Delaunay triangulation, which
@@ -530,7 +544,7 @@ class Spatial:
         ----------
         coords : sequence of array_like
             One array of positions per dimension, each of length N, e.g.
-            the ``x, y, z`` returned by :meth:`makeStellarCluster`. Pass
+            the ``x, y, z`` returned by [`makeStellarCluster`][ocotillopmf.spatial.Spatial.makeStellarCluster]. Pass
             only two of them, e.g. ``(x, y)``, for the MST of a projection.
 
         Returns
@@ -589,7 +603,14 @@ class Spatial:
         lengths = np.linalg.norm(segments[:, 1] - segments[:, 0], axis=1)
         return edges, lengths, segments
 
-    def lambdaMSR(self, coords, masses, nmst=10, nrand=500, overSeed=None):
+    def lambdaMSR(
+        self,
+        coords: Sequence[ArrayLike],
+        masses: ArrayLike,
+        nmst: int = 10,
+        nrand: int = 500,
+        overSeed: int | None = None,
+    ) -> tuple[float, float]:
         """Mass segregation ratio of Allison et al. (2009).
 
         Compares the MST length of the `nmst` most massive stars with the
@@ -602,7 +623,7 @@ class Spatial:
         ----------
         coords : sequence of array_like
             One array of positions per dimension, each of length N (see
-            :meth:`mst`). Pass two of them for the projected ratio.
+            [`mst`][ocotillopmf.spatial.Spatial.mst]). Pass two of them for the projected ratio.
         masses : array_like
             Stellar masses, of length N.
         nmst : int, optional
@@ -627,7 +648,7 @@ class Spatial:
         masses = np.asarray(masses)
         rng = self._rng(overSeed)
 
-        def mstLength(idx):
+        def mstLength(idx: np.ndarray) -> float:
             return self.mst(pos[idx].T)[1].sum()
 
         lMassive = mstLength(np.argsort(-masses, kind="stable")[:nmst])

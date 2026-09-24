@@ -2,6 +2,9 @@
 
 import numpy as np
 import scipy.interpolate as si
+from numpy.typing import ArrayLike
+
+from .accretion import PowerLawAccrete
 
 
 class LuminosityObject:
@@ -15,7 +18,7 @@ class LuminosityObject:
     ----------
     accObj : object
         Accretion model instance (e.g.
-        :class:`~ocotillopmf.accretion.PowerLawAccrete`) exposing an
+        [`PowerLawAccrete`][ocotillopmf.accretion.PowerLawAccrete]) exposing an
         ``acc`` method.
 
     Attributes
@@ -46,9 +49,9 @@ class LuminosityObject:
     G = 6.67259e-8
     MSUN = 1.988e33
 
-    accObj = None
+    accObj: PowerLawAccrete | None = None
 
-    def lZAMS(self, m):
+    def lZAMS(self, m: ArrayLike) -> float | np.ndarray:
         """Zero-age main sequence luminosity fit.
 
         Parameters
@@ -71,7 +74,7 @@ class LuminosityObject:
         )
         return LZAMS
 
-    def rZAMS(self, m):
+    def rZAMS(self, m: ArrayLike) -> float | np.ndarray:
         """Zero-age main sequence radius fit.
 
         Parameters
@@ -99,7 +102,7 @@ class LuminosityObject:
         )
         return RZAMS
 
-    def LZAMS(self, m, mf):
+    def LZAMS(self, m: ArrayLike, mf: ArrayLike) -> float | np.ndarray:
         """Zero-age main sequence luminosity, in cgs units.
 
         Parameters
@@ -118,7 +121,9 @@ class LuminosityObject:
         LZ = self.lZAMS(m) * self.LSUN
         return LZ
 
-    def LACC(self, m, mf, r):  # All in solar units
+    def LACC(
+        self, m: ArrayLike, mf: ArrayLike, r: ArrayLike
+    ) -> float | np.ndarray:  # All in solar units
         """Accretion luminosity.
 
         Parameters
@@ -141,7 +146,7 @@ class LuminosityObject:
         )
         return LA
 
-    def FUV_Frac(self, L, r):
+    def FUV_Frac(self, L: ArrayLike, r: ArrayLike) -> float | np.ndarray:
         """Fraction of luminosity emitted in the FUV band.
 
         Estimates an effective temperature from `L` and `r`, then looks
@@ -247,7 +252,9 @@ class LuminosityObject:
             else:
                 return frac(np.log10(Teff))
 
-    def FUV_LUM(self, m, mf, r):
+    def FUV_LUM(
+        self, m: ArrayLike, mf: ArrayLike, r: ArrayLike
+    ) -> float | np.ndarray:
         """Total FUV luminosity, combining ZAMS and accretion components.
 
         Parameters
@@ -270,5 +277,5 @@ class LuminosityObject:
         lafuv = la * self.FUV_Frac(la, r * self.RSUN)
         return lzfuv + lafuv
 
-    def __init__(self, accObj):
+    def __init__(self, accObj: PowerLawAccrete) -> None:
         self.accObj = accObj

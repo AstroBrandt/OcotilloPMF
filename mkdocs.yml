@@ -1,0 +1,72 @@
+site_name: OcotilloPMF
+repo_url: https://github.com/AstroBrandt/OcotilloPMF
+site_url: https://astrobrandt.github.io/OcotilloPMF/
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme)"
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+  features:
+    - navigation.sections
+    - content.code.copy
+
+hooks:
+  - hooks/theme_images.py
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: numpy
+            show_source: true
+            members_order: source
+  - mkdocs-jupyter:
+      execute: false
+
+markdown_extensions:
+  - admonition
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.snippets:
+      check_paths: true
+
+watch:
+  - README.md
+
+extra_css:
+  - stylesheets/extra.css
+
+extra_javascript:
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+nav:
+  - Home: index.md
+  - Examples:
+      - Protocluster generation: examples/protoclusterGen.ipynb
+      - Spatial clusters: examples/spatialClusterGen.ipynb
+  - API Reference:
+      - PMF: api/pmf.md
+      - Accretion: api/accretion.md
+      - Luminosity: api/luminosity.md
+      - Spatial: api/spatial.md
