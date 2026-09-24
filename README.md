@@ -33,13 +33,6 @@
       <img alt="Python versions" src="https://img.shields.io/pypi/pyversions/ocotillopmf?style=for-the-badge&label=Python&logo=python&labelColor=1C2233&logoColor=F4EFE6&color=F2A12E">
     </picture>
   </a>
-  <a href="https://doi.org/10.3847/1538-4357/aaaae2">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/DOI-10.3847%2F1538--4357%2Faaaae2-FF6A45?style=for-the-badge&labelColor=F4EFE6">
-      <source media="(prefers-color-scheme: light)" srcset="https://img.shields.io/badge/DOI-10.3847%2F1538--4357%2Faaaae2-EE4B2B?style=for-the-badge&labelColor=1C2233">
-      <img alt="DOI" src="https://img.shields.io/badge/DOI-10.3847%2F1538--4357%2Faaaae2-EE4B2B?style=for-the-badge&labelColor=1C2233">
-    </picture>
-  </a>
 </p>
 
 A Python package for sampling the protostellar mass function (PMF) — the
