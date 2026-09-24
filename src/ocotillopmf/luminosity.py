@@ -265,7 +265,7 @@ class LuminosityObject:
             Combined ZAMS + accretion FUV luminosity, in erg/s.
         """
         lz = self.LZAMS(m, mf)
-        la = self.LACC(m, mf, r * self.RSUN)
+        la = self.LACC(m, mf, r)
         lzfuv = lz * self.FUV_Frac(lz, r * self.RSUN)
         lafuv = la * self.FUV_Frac(la, r * self.RSUN)
         return lzfuv + lafuv

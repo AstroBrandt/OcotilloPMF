@@ -1,13 +1,13 @@
-"""Spatial sampling methods to produce physical clusters, also produce clouds if desired."""
+"""Fractal gas clouds and protostar cluster positions, with mass segregation and MST tools."""
+
+from itertools import combinations
 
 import numpy as np
 import numpy.random as nr
-import scipy.integrate as sint
-import scipy.interpolate as si
-import scipy.fft as sfft
-import scipy.special as ssp
+import scipy.sparse as ssparse
+import scipy.sparse.csgraph as scsg
+import scipy.spatial as sspat
 import scipy.spatial.distance as sdist
-
 from FyeldGenerator import generate_field
 
 
@@ -17,22 +17,24 @@ class Spatial:
     Builds log-normal fractional Brownian motion (fBm) density fields with
     a given fractal dimension or Hurst exponent, and uses them either
     directly as model gas clouds or as a probability density from which
-    protostar positions are drawn. Cluster positions can optionally be mass segregated
-    following Baumgardt et al. (2008), as implemented in McLuster
-    (Kuepper et al. 2011).
+    protostar positions are drawn. Cluster positions can optionally be
+    mass segregated following Baumgardt et al. (2008), as implemented in
+    McLuster (Kuepper et al. 2011), and characterized with minimum
+    spanning trees (:meth:`mst`) and the mass segregation ratio of
+    Allison et al. (2009) (:meth:`lambdaMSR`).
 
     Parameters
     ----------
     seed : int, optional
-        Seed stored on the object. Every call to :meth:`makeFBM` (and so
-        :meth:`makeCloudFBM` and :meth:`makeStellarCluster`) draws from a
-        fresh generator seeded with it, so repeated calls reproduce the
-        same field, and a cloud and a cluster made from the same object
-        share the same structure. The global NumPy random state is not
-        modified. Individual calls can override it with `overSeed`. If
-        None, each call draws from a freshly, randomly seeded generator,
-        so results are not reproducible and separate calls do not share
-        structure.
+        Seed stored on the object. Every method that draws random numbers
+        (:meth:`makeFBM`, :meth:`makeCloudFBM`, :meth:`makeStellarCluster`,
+        :meth:`segregate` and :meth:`lambdaMSR`) uses a fresh generator
+        seeded with it, so repeated calls give the same result, and a
+        cloud and a cluster made from the same object share the same
+        structure. The global NumPy random state is not modified.
+        Individual calls can override it with `overSeed`. If None, each
+        call draws from a freshly, randomly seeded generator, so results
+        are not reproducible and separate calls do not share structure.
     """
 
     def __init__(self, seed=None):
@@ -481,6 +483,14 @@ class Spatial:
             ``masses[i]``, sits at ``(coords[0][i], coords[1][i], ...)``.
             The set of positions is unchanged.
         """
+        if (S != None) and ((S < 0) or (S >= 1)):
+            raise ValueError(
+                "[OcotilloPMF error] When using mass segregation, the mass segregation parameter must be [0, 1)"
+            )
+
+        if not isinstance(masses, np.ndarray):
+            raise TypeError("[OcotilloPMF error] masses must be a 1D numpy array.")
+
         pos = np.column_stack(coords)
         nstar = len(pos)
 
@@ -507,3 +517,124 @@ class Spatial:
             assign[i] = free.pop(j)
 
         return [c[assign] for c in coords]
+
+    def mst(self, coords):
+        """Minimum spanning tree (MST) of a set of positions.
+
+        The MST is built from the edges of the Delaunay triangulation, which
+        always contains it, so memory and time scale roughly as N log N
+        rather than N^2. If the triangulation fails (too few or degenerate
+        points), all pairwise distances are used instead.
+
+        Parameters
+        ----------
+        coords : sequence of array_like
+            One array of positions per dimension, each of length N, e.g.
+            the ``x, y, z`` returned by :meth:`makeStellarCluster`. Pass
+            only two of them, e.g. ``(x, y)``, for the MST of a projection.
+
+        Returns
+        -------
+        edges : ndarray
+            Integer array of shape (N - 1, 2); each row holds the indices
+            of the two stars joined by an MST edge.
+        lengths : ndarray
+            Length of each edge, of shape (N - 1,). The total MST length
+            is ``lengths.sum()``.
+        segments : ndarray
+            Edge end points, of shape (N - 1, 2, ndim), ready for plotting,
+            e.g. with ``matplotlib.collections.LineCollection(segments)``
+            in 2D.
+
+        Notes
+        -----
+        Coincident positions are joined by zero-length edges, so the tree
+        always has N - 1 edges.
+        """
+        pos = np.column_stack(coords).astype(float)
+        nstar, ndim = pos.shape
+
+        pairs = None
+        if nstar > ndim + 1:
+            try:
+                tri = sspat.Delaunay(pos)
+                # Every pair of vertices within a simplex is a triangulation edge
+                pairs = [
+                    tri.simplices[:, [a, b]]
+                    for a, b in combinations(range(ndim + 1), 2)
+                ]
+                # Qhull leaves duplicate (and some near-degenerate) points out of
+                # the triangulation; connect each to its nearest vertex instead
+                pairs.append(tri.coplanar[:, [0, 2]])
+                pairs = np.unique(np.sort(np.concatenate(pairs), axis=1), axis=0)
+            except sspat.QhullError:
+                pairs = None
+        if pairs is None:
+            pairs = np.array(list(combinations(range(nstar), 2)), dtype=int).reshape(
+                -1, 2
+            )
+
+        weights = np.linalg.norm(pos[pairs[:, 0]] - pos[pairs[:, 1]], axis=1)
+        # csgraph treats a zero weight as no edge, so give coincident points the
+        # smallest positive weight to keep them connected
+        weights[weights == 0] = np.finfo(float).tiny
+        graph = ssparse.coo_matrix(
+            (weights, (pairs[:, 0], pairs[:, 1])), shape=(nstar, nstar)
+        )
+        tree = scsg.minimum_spanning_tree(graph).tocoo()
+
+        edges = np.column_stack([tree.row, tree.col])
+        segments = np.stack([pos[tree.row], pos[tree.col]], axis=1)
+        # Recompute from the positions so coincident points get a length of exactly 0
+        lengths = np.linalg.norm(segments[:, 1] - segments[:, 0], axis=1)
+        return edges, lengths, segments
+
+    def lambdaMSR(self, coords, masses, nmst=10, nrand=500, overSeed=None):
+        """Mass segregation ratio of Allison et al. (2009).
+
+        Compares the MST length of the `nmst` most massive stars with the
+        MST lengths of `nrand` random sets of `nmst` stars:
+        Lambda_MSR = <l_random> / l_massive. Lambda_MSR ~ 1 means no mass
+        segregation; Lambda_MSR > 1 means the most massive stars are more
+        concentrated than average.
+
+        Parameters
+        ----------
+        coords : sequence of array_like
+            One array of positions per dimension, each of length N (see
+            :meth:`mst`). Pass two of them for the projected ratio.
+        masses : array_like
+            Stellar masses, of length N.
+        nmst : int, optional
+            Number of most massive stars, and size of each random set.
+            Must be at least 2 and at most N. Default is 10.
+        nrand : int, optional
+            Number of random sets. Default is 500.
+        overSeed : int, optional
+            Seed for drawing the random sets instead of the object's
+            `seed`. If neither is set, the random sets (and so the result)
+            differ between calls.
+
+        Returns
+        -------
+        lam : float
+            The mass segregation ratio, Lambda_MSR.
+        lamErr : float
+            Its uncertainty, sigma_random / l_massive, where sigma_random
+            is the standard deviation of the random MST lengths.
+        """
+        pos = np.column_stack(coords)
+        masses = np.asarray(masses)
+        rng = self._rng(overSeed)
+
+        def mstLength(idx):
+            return self.mst(pos[idx].T)[1].sum()
+
+        lMassive = mstLength(np.argsort(-masses, kind="stable")[:nmst])
+        lRandom = np.array(
+            [
+                mstLength(rng.choice(len(masses), nmst, replace=False))
+                for _ in range(nrand)
+            ]
+        )
+        return np.mean(lRandom) / lMassive, np.std(lRandom) / lMassive

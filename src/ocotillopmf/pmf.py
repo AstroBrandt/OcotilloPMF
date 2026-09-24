@@ -259,8 +259,9 @@ class PMF:
         ML : float, optional
             Lower limit of the mass function. Default is 0.04.
         MU : float, optional
-            Upper limit of the mass function. Default os 3.0.
-        res : Size of the returning arrays. Default is 256.
+            Upper limit of the mass function. Default is 3.0.
+        res : int, optional
+            Size of the returning arrays. Default is 256.
 
         Returns
         -------
@@ -365,7 +366,7 @@ class PMF:
         ML : float, optional
             Lower limit of the mass function. Default is 0.04.
         MU : float, optional
-            Upper limit of the mass function. Default os 3.0.
+            Upper limit of the mass function. Default is 3.0.
 
         Returns
         -------
