@@ -85,7 +85,7 @@ full walkthrough, including luminosity calculations via `LuminosityObject`
 and convergence checks on the sampler. The cluster generate was vectorized, and has been tested for clusters up to 100,000 protostars. The PMF sampler converges quickly to the analytic, as shown below.
 
 ![PMF sampling convergence](https://raw.githubusercontent.com/AstroBrandt/OcotilloPMF/main/docs/assets/PMF_plots.png)
-\[**Caption**\] _Left_: Histogram distribution of the current protostar mass of generated clusters between 100 and 100,000 protostars. _Right_: Histogram distribution of the final masses. Note that they overlap since this is hard defined by a user-prescribed IMF, which is weighted then by the formation timescale.
+[**Caption:**] _Left_: Histogram distribution of the current protostar mass of generated clusters between 100 and 100,000 protostars. _Right_: Histogram distribution of the final masses. Note that they overlap since this is hard defined by a user-prescribed IMF, which is weighted then by the formation timescale.
 
 
 ## License
@@ -94,7 +94,7 @@ BSD-3-Clause
 
 ## Author
 
-Brandt Gaches (brandt.gaches@uni-due.de) \
-Emmy Noether Junior Group Leader \
-University of Duisburg-Essen \
+Brandt Gaches (brandt.gaches@uni-due.de)<br>
+Emmy Noether Junior Group Leader<br>
+University of Duisburg-Essen<br>
 [brandt.gaches.space](https://www.brandt-gaches.space)
