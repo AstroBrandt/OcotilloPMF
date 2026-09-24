@@ -15,9 +15,9 @@ class Spatial:
     """Generator for fractal gas clouds and the spatial distribution of star clusters.
 
     Builds log-normal fractional Brownian motion (fBm) density fields with
-    a given fractal dimension, and uses them either directly as model gas
-    clouds or as a 3D probability density from which protostar positions
-    are drawn. Cluster positions can optionally be mass segregated
+    a given fractal dimension or Hurst exponent, and uses them either
+    directly as model gas clouds or as a probability density from which
+    protostar positions are drawn. Cluster positions can optionally be mass segregated
     following Baumgardt et al. (2008), as implemented in McLuster
     (Kuepper et al. 2011).
 
@@ -43,7 +43,8 @@ class Spatial:
 
         Uses NumPy's legacy RandomState (Mersenne Twister), the same
         algorithm as ``numpy.random.seed``, so a given seed reproduces the
-        same draws as before while leaving the global NumPy state untouched.
+        same draws as ``numpy.random.seed`` with that seed, while leaving
+        the global NumPy state untouched.
         A seed of None seeds the generator randomly from the operating system.
         """
         if overSeed == None:
@@ -189,8 +190,8 @@ class Spatial:
         -------
         ndarray
             `field` rolled by a whole number of cells along each axis so
-            that its center of mass lies in cell ``shape // 2``. The
-            values are unchanged, only shifted.
+            that its center of mass lies in the cell nearest
+            ``shape // 2``. The values are unchanged, only shifted.
         """
         com = np.zeros(field.ndim)
         for ax, n in enumerate(field.shape):
@@ -327,7 +328,7 @@ class Spatial:
 
         Parameters
         ----------
-        nstar : int, required
+        nstar : int
             Number of stars to sample.
         ndim : int, optional
             Number of spatial dimensions. Default is 3.
@@ -369,8 +370,9 @@ class Spatial:
             :meth:`recenterField`). Default is False.
         nres : int, optional
             Number of grid cells along each axis of the density field.
-            Must match `nres` of a cloud from :meth:`makeCloudFBM` for the
-            two to share the same structure. Default is 128.
+            For a cloud from :meth:`makeCloudFBM` and a cluster to share
+            the same structure, they must use the same `nres`, seed,
+            `ndim`, and `D` or `H`. Default is 128.
         overSeed : int, optional
             Seed to use for this call instead of the object's `seed` (see
             :meth:`makeFBM`).
@@ -469,7 +471,8 @@ class Spatial:
             `coords`. Default is 1e-2.
         rng : numpy.random.RandomState, optional
             Generator to draw from. If None, a new generator seeded with
-            the object's `seed` is used.
+            the object's `seed` is used (randomly seeded if `seed` is
+            None).
 
         Returns
         -------
