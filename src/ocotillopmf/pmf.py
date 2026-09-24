@@ -1,9 +1,14 @@
 """Sampling of the bivariate protostellar mass function (PMF)."""
 
+from collections.abc import Callable
+
 import numpy as np
 import numpy.random as nr
 import scipy.integrate as sint
 import scipy.interpolate as si
+from numpy.typing import ArrayLike
+
+from .accretion import PowerLawAccrete
 
 
 class PMF:
@@ -18,11 +23,11 @@ class PMF:
     ----------
     accObj : object
         Accretion model instance (e.g.
-        :class:`~ocotillopmf.accretion.PowerLawAccrete`) exposing
+        [`PowerLawAccrete`][ocotillopmf.accretion.PowerLawAccrete]) exposing
         ``acc``, ``tacc``, and ``tmav`` methods.
     IMF : callable, optional
         Initial mass function, called as ``IMF(m)``. Defaults to
-        :meth:`Chabrier05`.
+        [`Chabrier05`][ocotillopmf.pmf.PMF.Chabrier05].
     mmax : float, optional
         Maximum stellar mass, in Msun. Default is 100.0.
     ml : float, optional
@@ -43,12 +48,12 @@ class PMF:
         See Parameters.
     """
 
-    accObj = None
-    IMF = None
+    accObj: PowerLawAccrete | None = None
+    IMF: Callable[[ArrayLike], float | np.ndarray] | None = None
     mmax = 100.0
     ml = 0.033
 
-    def Chabrier05(self, m):
+    def Chabrier05(self, m: ArrayLike) -> float | np.ndarray:
         """Chabrier (2005) system initial mass function.
 
         Parameters
@@ -71,7 +76,14 @@ class PMF:
         result = np.where(m < 1.0, lo, hi)
         return result.item() if result.ndim == 0 else result
 
-    def __init__(self, accObj, IMF=None, mmax=100.0, ml=0.033, seed=None):
+    def __init__(
+        self,
+        accObj: PowerLawAccrete,
+        IMF: Callable[[ArrayLike], float | np.ndarray] | None = None,
+        mmax: float = 100.0,
+        ml: float = 0.033,
+        seed: int | None = None,
+    ) -> None:
         if seed == None:
             nr.seed()
         else:
@@ -83,7 +95,7 @@ class PMF:
         self.mmax = mmax
         self.ml = ml
 
-    def IMFArr(self, m):
+    def IMFArr(self, m: ArrayLike) -> np.ndarray:
         """Vectorized IMF evaluation.
 
         Parameters
@@ -98,7 +110,9 @@ class PMF:
         """
         return np.array([self.IMF(mi) for mi in m])
 
-    def CIMF(self, ML=None, MU=None):
+    def CIMF(
+        self, ML: float | None = None, MU: float | None = None
+    ) -> Callable[[ArrayLike], np.ndarray]:
         """Inverse cumulative IMF, for inverse-transform sampling of the IMF alone.
 
         Parameters
@@ -124,7 +138,9 @@ class PMF:
         f = si.interp1d(cdist, marr)
         return f
 
-    def interpPhip2_mf(self, marr, mfarr, psip2, mi):
+    def interpPhip2_mf(
+        self, marr: np.ndarray, mfarr: np.ndarray, psip2: np.ndarray, mi: float
+    ) -> np.ndarray:
         """Linearly interpolate the bivariate PMF grid at a given current mass.
 
         Parameters
@@ -150,17 +166,19 @@ class PMF:
         else:
             try:
                 indx = np.where(mi <= marr)[0][0] - 1
-            except:
-                print("ERROR: mi = ", mi)
-                print("mmax = ", marr[-1])
-                print("mmin = ", marr[0])
+            except IndexError:
+                raise ValueError(
+                    f"Could not locate mi={mi} in marr (mmin={marr[0]}, mmax={marr[-1]}); "
+                    "mi may be NaN or marr may not be sorted."
+                ) from None
+
         mat0 = psip2[:, indx]
         mat1 = psip2[:, indx + 1]
         slp = (mat1 - mat0) / (marr[indx + 1] - marr[indx])
         dx = mi - marr[indx]
         return slp * dx + mat0
 
-    def psip2(self, m, mf):
+    def psip2(self, m: ArrayLike, mf: ArrayLike) -> float | np.ndarray:
         """Bivariate protostellar mass function.
 
         Parameters
@@ -178,7 +196,7 @@ class PMF:
         tav = self.accObj.tmav(self.IMF, self.ml, self.mmax)
         return (self.IMF(mf) * self.accObj.tacc(m, mf)) / (tav)
 
-    def PhiInvertSample(self, N=100):
+    def PhiInvertSample(self, N: int = 100) -> tuple[np.ndarray, np.ndarray]:
         """Sample the bivariate (current mass, final mass) distribution.
 
         Uses inverse-transform sampling on a discretized version of the
@@ -249,7 +267,9 @@ class PMF:
 
         return np.array(mis), np.array(mfs)
 
-    def calcPMF(self, ML=0.04, MU=3.0, res=2**8):
+    def calcPMF(
+        self, ML: float = 0.04, MU: float = 3.0, res: int = 2**8
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Calculate a semi-analytic PMF for a given upper and lower mass range.
 
         Numerically integrates the equation for the PMF, rather than discretely sampling the bivariation function.
@@ -285,7 +305,13 @@ class PMF:
         PSIM = np.array(PSIM) / self.accObj.tmav(self.IMF, ML, MU)
         return m, PSIM
 
-    def synthesisClusterStatistic(self, Nproto, Nsamp=None, funcQuantity=None):
+    def synthesisClusterStatistic(
+        self,
+        Nproto: ArrayLike,
+        Nsamp: ArrayLike | None = None,
+        funcQuantity: Callable[[np.ndarray, np.ndarray, np.ndarray], ArrayLike]
+        | None = None,
+    ) -> tuple[float | np.ndarray, float | np.ndarray]:
         """Mean and standard deviation of a cluster-integrated quantity.
 
         For each cluster size in `Nproto`, draws `Nsamp` independent
@@ -354,7 +380,7 @@ class PMF:
             return meanArr[0], stdArr[0]
         return meanArr, stdArr
 
-    def get_Ns(self, mmax, ML=0.04, MU=3.0):
+    def get_Ns(self, mmax: float, ML: float = 0.04, MU: float = 3.0) -> float:
         """Calculate the expected number of stars in a cluster, given a maximal sampled mass.
 
         Uses the PMF to solve for the expected number of protostars needed to be in a cluster to get a star of mass mmax, given the PMF mass limits
